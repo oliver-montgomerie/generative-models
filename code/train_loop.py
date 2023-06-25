@@ -1,35 +1,56 @@
 from imports import *
 
-def train(dict_key_for_training, max_epochs, learning_rate, train_loader, device):
-    model = AutoEncoder(
+BCELoss = torch.nn.BCELoss(reduction="sum")
+
+def loss_function(recon_x, x, mu, log_var, beta):
+    bce = BCELoss(recon_x, x)
+    kld = -0.5 * beta * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    return bce + kld
+
+
+def train(in_shape, max_epochs, latent_size, learning_rate, beta, train_loader, test_loader, device):
+    model = VarAutoEncoder(
         spatial_dims=2,
-        in_channels=1,
+        in_shape=in_shape,
         out_channels=1,
-        channels=(4, 8, 16, 32),
-        strides=(2, 2, 2, 2),
+        latent_size=latent_size,
+        channels=(16, 32, 64),
+        strides=(1, 2, 2),
     ).to(device)
 
-    # Create loss fn and optimiser
-    loss_function = torch.nn.MSELoss()
+    # Create optimiser
     optimizer = torch.optim.Adam(model.parameters(), learning_rate)
 
-    epoch_loss_values = []
+    avg_train_losses = []
+    test_losses = []
 
-    t = trange(max_epochs, desc=f"{dict_key_for_training} -- epoch 0, avg loss: inf", leave=True)
+    t = trange(max_epochs, leave=True, desc="epoch 0, average train loss: ?, test loss: ?")
     for epoch in t:
         model.train()
         epoch_loss = 0
-        step = 0
         for batch_data in train_loader:
-            step += 1
-            inputs = batch_data[dict_key_for_training].to(device)
+            inputs = batch_data["im"].to(device)
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = loss_function(outputs, batch_data["orig"].to(device))
+
+            recon_batch, mu, log_var, _ = model(inputs)
+            loss = loss_function(recon_batch, inputs, mu, log_var, beta)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-        epoch_loss /= step
-        epoch_loss_values.append(epoch_loss)
-        t.set_description(f"{dict_key_for_training} -- epoch {epoch + 1}" + f", average loss: {epoch_loss:.4f}")
-    return model, epoch_loss_values
+        avg_train_losses.append(epoch_loss / len(train_loader.dataset))
+
+        # Test
+        model.eval()
+        test_loss = 0
+        with torch.no_grad():
+            for batch_data in test_loader:
+                inputs = batch_data["im"].to(device)
+                recon, mu, log_var, _ = model(inputs)
+                # sum up batch loss
+                test_loss += loss_function(recon, inputs, mu, log_var, beta).item()
+        test_losses.append(test_loss / len(test_loader.dataset))
+
+        t.set_description(
+            f"epoch {epoch + 1}, average train loss: " f"{avg_train_losses[-1]:.4f}, test loss: {test_losses[-1]:.4f}"
+        )
+    return model, avg_train_losses, test_losses

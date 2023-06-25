@@ -1,32 +1,29 @@
 from imports import *#
 
-NoiseLambda = Lambda(
-    lambda d: {
-        "orig": d["im"],
-        "gaus": torch.tensor(random_noise(d["im"], mode="gaussian"), dtype=torch.float32),
-        "s&p": torch.tensor(random_noise(d["im"], mode="s&p", salt_vs_pepper=0.1)),
-    }
+load_transforms = Compose(
+    [
+        LoadImageD(keys=["im"], image_only=False),
+        EnsureChannelFirstD(keys=["im"]),
+        ScaleIntensityRanged(keys=["im"],
+            a_min=-200,
+            a_max=200,
+            b_min=0.0,
+            b_max=1.0,
+            clip=True,),
+        Orientationd(keys=["im"], axcodes="LA"),
+        Rotate90d(["im"], k=1, spatial_axes=(0, 1)),
+        EnsureTypeD(keys=["im"]),
+    ]
 )
 
 train_transforms = Compose(
     [
-        LoadImageD(keys=["im"]),
-        EnsureChannelFirstD(keys=["im"]),
-        ScaleIntensityD(keys=["im"]),
-        RandRotateD(keys=["im"], range_x=np.pi / 12, prob=0.5, keep_size=True),
-        RandFlipD(keys=["im"], spatial_axis=0, prob=0.5),
-        RandZoomD(keys=["im"], min_zoom=0.9, max_zoom=1.1, prob=0.5),
-        EnsureTypeD(keys=["im"]),
-        NoiseLambda,
+        load_transforms,
     ]
-)
+).flatten()
 
 test_transforms = Compose(
     [
-        LoadImageD(keys=["im"]),
-        EnsureChannelFirstD(keys=["im"]),
-        ScaleIntensityD(keys=["im"]),
-        EnsureTypeD(keys=["im"]),
-        NoiseLambda,
+        load_transforms,
     ]
-)
+).flatten()

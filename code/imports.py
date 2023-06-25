@@ -1,3 +1,5 @@
+import time
+from IPython import display
 import logging
 import os
 import shutil
@@ -8,21 +10,22 @@ import numpy as np
 from tqdm import trange
 import matplotlib.pyplot as plt
 import torch
-from skimage.util import random_noise
+from urllib.request import urlretrieve
+import gzip
+from PIL import Image
 
 from monai.apps import download_and_extract
 from monai.config import print_config
 from monai.data import CacheDataset, DataLoader
-from monai.networks.nets import AutoEncoder
+from monai.networks.nets import VarAutoEncoder
 from monai.transforms import (
     EnsureChannelFirstD,
     Compose,
     LoadImageD,
-    RandFlipD,
-    RandRotateD,
-    RandZoomD,
-    ScaleIntensityD,
+    ScaleIntensityRanged,
     EnsureTypeD,
-    Lambda,
+    Orientationd,
+    Rotate90d,
+
 )
 from monai.utils import set_determinism
