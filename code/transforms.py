@@ -1,4 +1,4 @@
-from imports import *#
+from imports import *
 
 load_transforms = Compose(
     [
@@ -12,6 +12,8 @@ load_transforms = Compose(
             clip=True,),
         Orientationd(keys=["im"], axcodes="LA"),
         Rotate90d(["im"], k=1, spatial_axes=(0, 1)),
+        Spacingd(keys=["im"], pixdim=(0.793, 0.793), mode=("bilinear")),
+        ResizeWithPadOrCropd(keys=["im"], spatial_size = [560,560]),
         EnsureTypeD(keys=["im"]),
     ]
 )

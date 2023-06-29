@@ -8,10 +8,12 @@ import tempfile
 import random
 import numpy as np
 from tqdm import trange
+import matplotlib.pyplot as plt
 import torch
 from urllib.request import urlretrieve
 import gzip
 from PIL import Image
+
 from monai.apps import download_and_extract
 from monai.config import print_config
 from monai.data import CacheDataset, DataLoader
@@ -24,13 +26,16 @@ from monai.transforms import (
     EnsureTypeD,
     Orientationd,
     Rotate90d,
-    Spacingd,
-    ResizeWithPadOrCropd,
+
 )
 from monai.utils import set_determinism
 
-## Top for viewing. Below lines for saving
-#import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')
-from matplotlib import pyplot as plt
+latent_size = 3
+dist = torch.distributions.normal.Normal(torch.tensor(0.0), torch.tensor(1.0))
+
+for i in range(10):
+    sample = torch.zeros(1, latent_size)
+    for s in range(sample.shape[1]):
+        sample[0,s] = dist.icdf((torch.rand(1)*0.9) + 0.05)
+
+print(sample)

@@ -5,6 +5,7 @@ BCELoss = torch.nn.BCELoss(reduction="sum")
 def loss_function(recon_x, x, mu, log_var, beta):
     bce = BCELoss(recon_x, x)
     kld = -0.5 * beta * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    #print(f"bce: {bce}, kld: {kld}")
     return bce + kld
 
 
@@ -14,8 +15,10 @@ def train(in_shape, max_epochs, latent_size, learning_rate, beta, train_loader, 
         in_shape=in_shape,
         out_channels=1,
         latent_size=latent_size,
-        channels=(16, 32, 64),
-        strides=(1, 2, 2),
+        channels=(16, 32, 64, 128, 256),
+        strides=(1, 2, 2, 2, 2),
+        # channels=(16, 32, 64), #change in generate images too
+        # strides=(1, 2, 2),
     ).to(device)
 
     # Create optimiser
@@ -24,8 +27,8 @@ def train(in_shape, max_epochs, latent_size, learning_rate, beta, train_loader, 
     avg_train_losses = []
     test_losses = []
 
-    t = trange(max_epochs, leave=True, desc="epoch 0, average train loss: ?, test loss: ?")
-    for epoch in t:
+    #t = trange(max_epochs, leave=True, desc="epoch 0, average train loss: ?, test loss: ?")
+    for epoch in range(max_epochs):
         model.train()
         epoch_loss = 0
         for batch_data in train_loader:
@@ -49,8 +52,8 @@ def train(in_shape, max_epochs, latent_size, learning_rate, beta, train_loader, 
                 # sum up batch loss
                 test_loss += loss_function(recon, inputs, mu, log_var, beta).item()
         test_losses.append(test_loss / len(test_loader.dataset))
-
-        t.set_description(
-            f"epoch {epoch + 1}, average train loss: " f"{avg_train_losses[-1]:.4f}, test loss: {test_losses[-1]:.4f}"
-        )
+        print(f"epoch {epoch + 1}, average train loss: " f"{avg_train_losses[-1]:.4f}, test loss: {test_losses[-1]:.4f}")
+        # t.set_description(
+        #     f"epoch {epoch + 1}, average train loss: " f"{avg_train_losses[-1]:.4f}, test loss: {test_losses[-1]:.4f}"
+        # )
     return model, avg_train_losses, test_losses
