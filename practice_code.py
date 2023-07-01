@@ -30,12 +30,18 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 
-latent_size = 3
-dist = torch.distributions.normal.Normal(torch.tensor(0.0), torch.tensor(1.0))
+# latent_size = 3
+# dist = torch.distributions.normal.Normal(torch.tensor(0.0), torch.tensor(1.0))
 
-for i in range(10):
-    sample = torch.zeros(1, latent_size)
-    for s in range(sample.shape[1]):
-        sample[0,s] = dist.icdf((torch.rand(1)*0.9) + 0.05)
+# for i in range(10):
+#     sample = torch.zeros(1, latent_size)
+#     for s in range(sample.shape[1]):
+#         sample[0,s] = dist.icdf((torch.rand(1)*0.9) + 0.05)
 
-print(sample)
+# print(sample)
+
+x = [1,2,3]
+y = [4,5,6]
+print("ok")
+for i in x+y:
+    print(i)
