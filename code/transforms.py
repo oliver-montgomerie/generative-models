@@ -45,7 +45,7 @@ load_slice_transforms = Compose(
 
 
 deform = Rand2DElasticd(
-    keys = ["image", "label"],
+    keys = ["im"],
     prob=0.5,
     spacing=(55, 55),
     magnitude_range=(-1.1,1.1),
