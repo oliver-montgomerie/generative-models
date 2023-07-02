@@ -9,8 +9,8 @@ def stuff():
     all_images = sorted(glob.glob(os.path.join(data_dir, "Images", "*.nii")))
     all_labels = sorted(glob.glob(os.path.join(data_dir, "Labels", "*.nii")))
     data_dicts = [{"image": image_name, "label": label_name} for image_name, label_name in zip(all_images, all_labels)]
-    # filter out slices with small tumor area
-    data_dicts = [item for item in data_dicts if file_tumor_size(item) > min_tumor_size]
+    # filter FOR slices with small tumor area or no tumor
+    data_dicts = [item for item in data_dicts if file_tumor_size(item) < min_tumor_size]
 
     test_files, val_files, train_files = [], [], []
     for d in data_dicts:
@@ -44,11 +44,18 @@ def stuff():
             min_0 = np.min(idx[:,0])
             max_0 = np.max(idx[:,0])
             min_1 = np.min(idx[:,1])
-            max_2 = np.max(idx[:,1])
+            max_1 = np.max(idx[:,1])
+
+            if max_0 - min_0 > largest_0:
+                largest_0 = max_0 - min_0
+                
+            if max_1 - min_1 > largest_1:
+                largest_1 = max_1 - min_1
+
 
             buffer = 1
-            tumor_img = np.copy(np_img[min_0-buffer:max_0+buffer+1, min_1-buffer:max_2+buffer+1])
-            tumor_lbl = np.copy(gt_seperated_tumor_labels[min_0-buffer:max_0+buffer+1, min_1-buffer:max_2+buffer+1])
+            tumor_img = np.copy(np_img[min_0-buffer:max_0+buffer+1, min_1-buffer:max_1+buffer+1])
+            tumor_lbl = np.copy(gt_seperated_tumor_labels[min_0-buffer:max_0+buffer+1, min_1-buffer:max_1+buffer+1])
 
             tumor_img[tumor_lbl != i+1] = np.min(np_img)
             tumor_lbl[tumor_lbl != i+1] = 0.0
@@ -67,9 +74,12 @@ def stuff():
 
             ni_img = nib.Nifti1Image(tumor_img, img.affine) #, img.header (?)
             ni_lbl = nib.Nifti1Image(tumor_lbl, lbl.affine, dtype='<i2')
-            print(f"saving: {img_path[:-4]}_{str(tumor_size)}.nii")
+            #print(f"saving: {img_path[:-4]}_{str(tumor_size)}.nii")
             nib.save(ni_img, os.path.join(img_save_path, fname + "_" + str(tumor_size) + ".nii"))
-            #nib.save(ni_lbl, os.path.join(lbl_save_path, fname + "_" + str(tumor_size) + ".nii"))
+            ##nib.save(ni_lbl, os.path.join(lbl_save_path, fname + "_" + str(tumor_size) + ".nii"))
+
+    print("largest: ",largest_0, largest_1)
+
 
 if __name__ == '__main__':
     stuff()

@@ -18,23 +18,38 @@ from monai.config import print_config
 from monai.data import CacheDataset, DataLoader
 from monai.networks.nets import VarAutoEncoder
 from monai.transforms import (
-    EnsureChannelFirstD,
+    AsDiscrete,
+    AsDiscreted,
+    EnsureChannelFirstd,
     Compose,
-    LoadImageD,
-    ScaleIntensityRanged,
-    EnsureTypeD,
+    CropForegroundd,
+    Flipd,
+    LoadImaged,
+    MapTransform,
     Orientationd,
+    PadListDataCollate,
+    Rand2DElasticd,
+    RandAxisFlipd,
+    RandCropByPosNegLabeld,
+    RandGaussianNoised,
+    RandRotated,
+    RandZoomd,
     Rotate90d,
-    Spacingd,
     ResizeWithPadOrCropd,
+    SaveImaged,
+    ScaleIntensityRanged,
+    Spacingd,
+    Invertd,
+    EnsureTyped,
 )
 from monai.utils import set_determinism
+from monai.data.utils import pad_list_data_collate
 
 ## Top for viewing. Below lines for saving
-import matplotlib.pyplot as plt
-# import matplotlib
-# matplotlib.use('Agg')
-# from matplotlib import pyplot as plt
+#import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 
 from skimage.measure import label as seperate_instances
 
@@ -48,4 +63,13 @@ def file_tumor_size(file):
     lbl = nib.load(file['label']) 
     np_lbl = np.array(lbl.dataobj)
     size_tumors = np.sum(np_lbl == 2) * lbl.header['pixdim'][1] * lbl.header['pixdim'][2]
+    return size_tumors
+
+
+min_liver_size = 314 # pi  mm^2  for diameter 2cm tumors
+
+def file_liver_size(file):
+    lbl = nib.load(file['label']) 
+    np_lbl = np.array(lbl.dataobj)
+    size_tumors = np.sum(np_lbl == 1) * lbl.header['pixdim'][1] * lbl.header['pixdim'][2]
     return size_tumors
