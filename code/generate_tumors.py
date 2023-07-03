@@ -39,9 +39,9 @@ def generate_tumors(num_ims, img_shape, latent_size, device, save_path):
             plt.imshow(o, cmap="gray")
             plt.subplot(1,3,3)
             plt.imshow(mask)
-            plt.show()
-            #plt.savefig(os.path.join(save_path, "img-"+str(i)), bbox_inches='tight')
-            #plt.close()   
+            #plt.show()
+            plt.savefig(os.path.join(save_path, "img-"+str(i)), bbox_inches='tight')
+            plt.close()   
 
 
     # with torch.no_grad():
@@ -69,9 +69,9 @@ num_test = int(len(all_filenames) * test_frac) #2
 test_datadict = [{"im": fname} for fname in all_filenames[-num_test:]]
 from transforms import load_tumor_transforms
 im_shape = load_tumor_transforms(test_datadict[0])["im"].shape
-latent_size = 2
+latent_size = 10
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-save_path = "/home/omo23/Documents/generative-models/VAE-generated/latent-2-epochs-50"
+save_path = "/home/omo23/Documents/generative-models/VAE-generated/latent-10-epochs-20"
 
 generate_tumors(num_ims=10,
                 img_shape=im_shape,
