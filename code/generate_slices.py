@@ -82,14 +82,21 @@ def generate_slices(model, tumor_shape, device):
 
         #todo: here. maybe include this in the attempts part, instead of searching for half size. search >90% pixels inside liver
             #shift the tumor so that the centre = location.
-            #tumor_lbl = 
-            #tumor_img = 
+            tumor_lbl = np.roll(tumor_lbl, location[0] - tumor_centre[0], axis=0)
+            tumor_lbl = np.roll(tumor_lbl, location[1] - tumor_centre[1], axis=1)
+            tumor_img = np.roll(tumor_img, location[0] - tumor_centre[0], axis=0)
+            tumor_img = np.roll(tumor_img, location[1] - tumor_centre[1], axis=1)
 
-            #set tumor label = 3?
+            tumor_lbl[tumor_lbl==1] = 3
             # add tumor label to img label. if there are lots of 3's then it means outside liver
             # if lots of 4's then it was inside the liver
             # 5 means on- top of another tumor, which is also ok
+            gen_lbl = lbl + tumor_lbl
+            not_liver = len(np.argwhere(gen_lbl == 3))
+            in_liver = len(np.argwhere(gen_lbl > 3))
 
+            if in_liver / (in_liver + not_liver) > 0.9:
+                pass #good
 
              # add a probability for repeating the process for adding multiple tumors.
              # look at ratio in other slices and use that??
