@@ -46,10 +46,10 @@ from monai.utils import set_determinism
 from monai.data.utils import pad_list_data_collate
 
 ## Top for viewing. Below lines for saving
-#import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+# import matplotlib
+# matplotlib.use('Agg')
+# from matplotlib import pyplot as plt
 
 from skimage.measure import label as seperate_instances
 

@@ -16,6 +16,13 @@ def generate_a_tumor(model, dist, tumor_shape, device):
         #clip the tumor to the mask size
         o[mask != 1] = 0
 
+        # pad to slice size
+        pad_size = np.array([560, 560]) - np.array([o.shape[1],o.shape[2]])
+        o = np.pad(o, [(0, 0), (pad_size[0], 0), (pad_size[1], 0)])
+
+        pad_size = np.array([560, 560]) - np.array([mask.shape[1],mask.shape[2]])
+        mask = np.pad(mask, [(0, 0), (pad_size[0], 0), (pad_size[1], 0)])
+
         return o, mask
 
 
@@ -65,58 +72,74 @@ def generate_slices(model, tumor_shape, device):
             liver_pix = np.argwhere(lbl == 1)
 
             #generate tumor that is smaller than half the liver size
+            # max_size_attempts = 5
+            # max_place_attempts = 10
+            # for size_attempts in range(max_size_attempts):
+            # for place_attempts in range(max_place_attempts):
             max_attempts = 20
-            for attempts in range(max_attempts):
+            good_placement = False
+            for attempt in range(max_attempts):
                 tumor_img, tumor_lbl = generate_a_tumor(model, dist, tumor_shape, device)
-                if len(np.argwhere(tumor_lbl == 1)) < len(liver_pix) / 2:
-                    continue
 
-            if attempts == max_attempts: #skip the slice if we couldnt get a small enough tumor
-                continue
+                # if len(np.argwhere(tumor_lbl == 1)) < len(liver_pix) / 2:
+                #     continue
 
-            #insert into liver
-            tumor_pix = np.argwhere(tumor_lbl == 1)
-            tumor_centre = np.mean(tumor_pix, axis = 0)
+                # if size_attempts == max_size_attempts: #skip the slice if we couldnt get a small enough tumor
+                #     continue
 
-            location = random.choice(liver_pix)
+                #insert into liver
+                tumor_pix = np.argwhere(tumor_lbl == 1)
+                tumor_centre = np.mean(tumor_pix, axis = 0,dtype=int)
 
-        #todo: here. maybe include this in the attempts part, instead of searching for half size. search >90% pixels inside liver
-            #shift the tumor so that the centre = location.
-            tumor_lbl = np.roll(tumor_lbl, location[0] - tumor_centre[0], axis=0)
-            tumor_lbl = np.roll(tumor_lbl, location[1] - tumor_centre[1], axis=1)
-            tumor_img = np.roll(tumor_img, location[0] - tumor_centre[0], axis=0)
-            tumor_img = np.roll(tumor_img, location[1] - tumor_centre[1], axis=1)
+                location = random.choice(liver_pix)
 
-            tumor_lbl[tumor_lbl==1] = 3
-            # add tumor label to img label. if there are lots of 3's then it means outside liver
-            # if lots of 4's then it was inside the liver
-            # 5 means on- top of another tumor, which is also ok
-            gen_lbl = lbl + tumor_lbl
-            not_liver = len(np.argwhere(gen_lbl == 3))
-            in_liver = len(np.argwhere(gen_lbl > 3))
+                #shift the tumor so that the centre = location.
+                tumor_lbl = np.roll(tumor_lbl, location[1] - tumor_centre[1], axis=1)
+                tumor_lbl = np.roll(tumor_lbl, location[2] - tumor_centre[2], axis=2)
+                tumor_img = np.roll(tumor_img, location[1] - tumor_centre[1], axis=1)
+                tumor_img = np.roll(tumor_img, location[2] - tumor_centre[2], axis=2)
 
-            if in_liver / (in_liver + not_liver) > 0.9:
-                pass #good
+                tumor_lbl[tumor_lbl==1] = 3
+                # add tumor label to img label. if there are lots of 3's then it means outside liver
+                # if lots of 4's then it was inside the liver
+                # 5 means on- top of another tumor, which is also ok
+                gen_lbl = lbl + tumor_lbl
+                
+
+                not_liver = len(np.argwhere(gen_lbl == 3))
+                in_liver = len(np.argwhere(gen_lbl > 3))
+
+                print(f"in_liver ratio: {in_liver / (in_liver + not_liver)}")
+                if in_liver / (in_liver + not_liver) > 0.9:
+                    good_placement = True
+                    break #good
 
              # add a probability for repeating the process for adding multiple tumors.
              # look at ratio in other slices and use that??
 
 
+            if good_placement == False:
+                continue
+                
+            #todo: check here
+            gen_img = img.detach().clone() #.numpy()
+            gen_img[tumor_lbl > 3] = tumor_img[tumor_lbl > 3]
+
             plt.figure()
             plt.subplot(3,2,1)
-            plt.imshow(img, cmap="gray")
+            plt.imshow(img[0,:,:], cmap="gray")
             plt.subplot(3,2,2)
-            plt.imshow(lbl)
+            plt.imshow(lbl[0,:,:])
 
             plt.subplot(3,2,3)
-            plt.imshow(tumor_img, cmap="gray")
+            plt.imshow(tumor_img[0,:,:], cmap="gray")
             plt.subplot(3,2,4)
-            plt.imshow(tumor_lbl)
+            plt.imshow(tumor_lbl[0,:,:])
 
             plt.subplot(3,2,5)
-            plt.imshow(gen_img, cmap="gray")
+            plt.imshow(gen_img[0,:,:], cmap="gray")
             plt.subplot(3,2,6)
-            plt.imshow(gen_lbl)
+            plt.imshow(gen_lbl[0,:,:])
             plt.show()
             ## todo: save the plot instead
 
@@ -127,7 +150,7 @@ def generate_slices(model, tumor_shape, device):
 tumor_shape = [1,256,256]
 latent_size = 2
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-load_path = "/home/omo23/Documents/generative-models/VAE-generated/latent-2-epochs-50"
+load_path = "/home/omo23/Documents/generative-models/VAE-generated/latent-2-epochs-20"
 
 model = VarAutoEncoder(
     spatial_dims=2,
