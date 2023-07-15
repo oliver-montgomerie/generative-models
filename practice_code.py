@@ -40,8 +40,10 @@ from monai.utils import set_determinism
 
 # print(sample)
 
-x = [1,2,3]
-y = [4,5,6]
-print("ok")
-for i in x+y:
-    print(i)
+x = [1,2,3,4,5,6]
+y = [2,4,5,6]
+z = [3,9,15]
+
+for a in x:
+    if a not in y + z:
+        print(a)

@@ -1,7 +1,7 @@
 from imports import *
 
 class flip_if_liver_on_right(MapTransform):
-    #for viewing 2d slices
+    #should take in image key as arg too..
     def __init__(self, keys, label_key):
         self.keys = keys
         self.label_key = label_key
@@ -27,17 +27,17 @@ load_slice_transforms = Compose(
     [
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
-        ScaleIntensityRanged(
-            keys=["image"],
-            a_min=-200,
-            a_max=200,
-            b_min=0.0,
-            b_max=1.0,
-            clip=True,
-        ),
-        Orientationd(keys=["image", "label"], axcodes="LA"),
-        Rotate90d(["image", "label"], k=1, spatial_axes=(0, 1)),
-        flip_if_liver_on_right(keys=["image", "label"], label_key="label"),
+        # ScaleIntensityRanged(
+        #     keys=["image"],
+        #     a_min=-200,
+        #     a_max=200,
+        #     b_min=0.0,
+        #     b_max=1.0,
+        #     clip=True,
+        # ),
+        # Orientationd(keys=["image", "label"], axcodes="LA"),
+        # Rotate90d(["image", "label"], k=1, spatial_axes=(0, 1)),
+        # flip_if_liver_on_right(keys=["image", "label"], label_key="label"),
         Spacingd(keys=["image", "label"], pixdim=(0.793, 0.793), mode=("bilinear", "nearest")),
         ResizeWithPadOrCropd(keys=["image", "label"], spatial_size = [560,560]),
     ]

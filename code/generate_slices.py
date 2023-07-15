@@ -7,29 +7,21 @@ def generate_a_tumor(model, dist, tumor_shape, device):
             #todo: maybe This should be weighted towards the edges for unusual looking tumors?
             sample[0,s] = dist.icdf((torch.rand(1)*0.9) + 0.05)
 
-        o = model.decode_forward(sample)
+        o = model.decode_forward(sample) #get output from latent sample
         o = o.detach().cpu().numpy().reshape(tumor_shape)
-        mask = np.zeros(o.shape)
+        mask = np.zeros(o.shape)    #create mask from thresholding tumor
         thresh = (np.max(o) + np.min(o))/2
         mask[o > thresh] = 1
-
         #clip the tumor to the mask size
         o[mask != 1] = 0
 
-        # pad to slice size
-        pad_size = np.array([560, 560]) - np.array([o.shape[1],o.shape[2]])
-        o = np.pad(o, [(0, 0), (pad_size[0], 0), (pad_size[1], 0)])
-
-        pad_size = np.array([560, 560]) - np.array([mask.shape[1],mask.shape[2]])
-        mask = np.pad(mask, [(0, 0), (pad_size[0], 0), (pad_size[1], 0)])
-
-        return o, mask
+        return o[0,:,:], mask[0,:,:]
 
 
 ## viewing
 def generate_slices(model, tumor_shape, device):
-    img_save_path = "/home/omo23/Documents/generated-data/VAE/Images"
-    lbl_save_path = "/home/omo23/Documents/generated-data/VAE/Labels"
+    img_save_path = "/home/omo23/Documents/generated-data/VAE-GAN/Images"
+    lbl_save_path = "/home/omo23/Documents/generated-data/VAE-GAN/Labels"
     
     #Data loading
     data_dir = "/home/omo23/Documents/sliced-data"
@@ -37,120 +29,177 @@ def generate_slices(model, tumor_shape, device):
     all_labels = sorted(glob.glob(os.path.join(data_dir, "Labels", "*.nii")))
     data_dicts = [{"image": image_name, "label": label_name} for image_name, label_name in zip(all_images, all_labels)]
     # filter FOR slices with small tumor area or no tumor
-    data_dicts = [item for item in data_dicts if file_tumor_size(item) < min_tumor_size]
-    data_dicts = [item for item in data_dicts if file_liver_size(item) > min_liver_size]
+    data_dicts = [item for item in data_dicts if file_tumor_size(item) == 0] # min_tumor_size]
 
-    test_files, val_files, train_files = [], [], []
+    gen_files = []
     for d in data_dicts:
         d_num = d['image']
         d_num = d_num[d_num.rfind("/")+1:d_num.rfind("-")] 
-        #if d_num in test_files_nums:
-        #    test_files.append(d)
-        if d_num in val_files_nums:
-            val_files.append(d)
-        if d_num in train_files_nums:
-            train_files.append(d)
 
-    num_workers = 4
-    batch_size = 16
-    from transforms import load_slice_transforms
-    ds = CacheDataset(train_files + val_files, load_slice_transforms, num_workers=num_workers)
-    data_loader = DataLoader(ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=pad_list_data_collate)
+        if d_num not in test_files_nums + val_files_nums:
+            gen_files.append(d)
 
-    dist = torch.distributions.normal.Normal(torch.tensor(0.0), torch.tensor(1.0))
+    t_spacing = Spacing(pixdim=(0.793, 0.793), mode=("bilinear"))
 
-    for batch_data in data_loader:
-        #Slices with no/ or small tumor
-        imgs, lbls = (
-                    batch_data["image"].to(device),
-                    batch_data["label"].to(device),
-                )
-        for i in range(imgs.shape[0]):
-            img = imgs[i,:,:,:].cpu()
-            lbl = lbls[i,:,:,:].cpu()
+    for file in gen_files:
+        img_path = file['image']
+        lbl_path = file['label']
+        fname = img_path[img_path.rfind("/")+1:img_path.rfind(".")] 
 
-            liver_pix = np.argwhere(lbl == 1)
+        nib_img = nib.load(img_path)
+        nib_lbl = nib.load(lbl_path)
 
-            #generate tumor that is smaller than half the liver size
-            # max_size_attempts = 5
-            # max_place_attempts = 10
-            # for size_attempts in range(max_size_attempts):
-            # for place_attempts in range(max_place_attempts):
-            max_attempts = 20
-            good_placement = False
-            for attempt in range(max_attempts):
-                tumor_img, tumor_lbl = generate_a_tumor(model, dist, tumor_shape, device)
+        img = np.array(nib_img.dataobj)
+        lbl = np.array(nib_lbl.dataobj)
 
-                # if len(np.argwhere(tumor_lbl == 1)) < len(liver_pix) / 2:
-                #     continue
+        dist = torch.distributions.normal.Normal(torch.tensor(0.0), torch.tensor(1.0))
 
-                # if size_attempts == max_size_attempts: #skip the slice if we couldnt get a small enough tumor
-                #     continue
+        liver_pix = np.argwhere(lbl == 1)
 
-                #insert into liver
-                tumor_pix = np.argwhere(tumor_lbl == 1)
-                tumor_centre = np.mean(tumor_pix, axis = 0,dtype=int)
-
-                location = random.choice(liver_pix)
-
-                #shift the tumor so that the centre = location.
-                tumor_lbl = np.roll(tumor_lbl, location[1] - tumor_centre[1], axis=1)
-                tumor_lbl = np.roll(tumor_lbl, location[2] - tumor_centre[2], axis=2)
-                tumor_img = np.roll(tumor_img, location[1] - tumor_centre[1], axis=1)
-                tumor_img = np.roll(tumor_img, location[2] - tumor_centre[2], axis=2)
-
-                tumor_lbl[tumor_lbl==1] = 3
-                # add tumor label to img label. if there are lots of 3's then it means outside liver
-                # if lots of 4's then it was inside the liver
-                # 5 means on- top of another tumor, which is also ok
-                gen_lbl = lbl + tumor_lbl
-                
-
-                not_liver = len(np.argwhere(gen_lbl == 3))
-                in_liver = len(np.argwhere(gen_lbl > 3))
-
-                print(f"in_liver ratio: {in_liver / (in_liver + not_liver)}")
-                if in_liver / (in_liver + not_liver) > 0.9:
-                    good_placement = True
-                    break #good
-
-             # add a probability for repeating the process for adding multiple tumors.
-             # look at ratio in other slices and use that??
-
-
-            if good_placement == False:
+        max_attempts = 20
+        good_placement = False
+        for attempt in range(max_attempts):
+            tumor_img, tumor_lbl = generate_a_tumor(model, dist, tumor_shape, device)
+            # make sure its large enough
+            tumor_size = np.sum(tumor_lbl == 1) * nib_lbl.header['pixdim'][1] * nib_lbl.header['pixdim'][2]
+            tumor_size = int(tumor_size)
+            if tumor_size < min_tumor_size:
                 continue
-                
-            #todo: check here
-            gen_img = img.detach().clone() #.numpy()
-            gen_img[tumor_lbl > 3] = tumor_img[tumor_lbl > 3]
 
-            plt.figure()
-            plt.subplot(3,2,1)
-            plt.imshow(img[0,:,:], cmap="gray")
-            plt.subplot(3,2,2)
-            plt.imshow(lbl[0,:,:])
+            #resample to images resolution (from (0.793, 0.793))
+            # todo: this ^ use the t_spacing above?
 
-            plt.subplot(3,2,3)
-            plt.imshow(tumor_img[0,:,:], cmap="gray")
-            plt.subplot(3,2,4)
-            plt.imshow(tumor_lbl[0,:,:])
+            #rescale back to hounsfield(?)
+            tumor_img = (tumor_img * 400) - 200
 
-            plt.subplot(3,2,5)
-            plt.imshow(gen_img[0,:,:], cmap="gray")
-            plt.subplot(3,2,6)
-            plt.imshow(gen_lbl[0,:,:])
-            plt.show()
-            ## todo: save the plot instead
+            # pad to slice size
+            pad_size = img.shape - np.array([tumor_img.shape[0],tumor_img.shape[1]])
+            tumor_img = np.pad(tumor_img, [(pad_size[0], 0), (pad_size[1], 0)], mode='constant', constant_values=np.min(tumor_img))
+
+            pad_size = lbl.shape - np.array([tumor_lbl.shape[0],tumor_lbl.shape[1]])
+            tumor_lbl = np.pad(tumor_lbl, [(pad_size[0], 0), (pad_size[1], 0)], mode='constant', constant_values=0)
+            
+            
+            #choose location to insert into liver
+            tumor_pix = np.argwhere(tumor_lbl == 1)
+            tumor_centre = np.mean(tumor_pix, axis = 0,dtype=int)
+
+            location = random.choice(liver_pix)
+
+            #shift the tumor so that the centre = location.
+            tumor_lbl = np.roll(tumor_lbl, location[0] - tumor_centre[0], axis=0)
+            tumor_lbl = np.roll(tumor_lbl, location[1] - tumor_centre[1], axis=1)
+            tumor_img = np.roll(tumor_img, location[0] - tumor_centre[0], axis=0)
+            tumor_img = np.roll(tumor_img, location[1] - tumor_centre[1], axis=1)
+
+            tumor_lbl[tumor_lbl==1] = 3
+            # add tumor label to img label. if there are lots of 3's then it means outside liver
+            # if lots of 4's then it was inside the liver
+            # 5 means on- top of another tumor, which is also ok
+            gen_lbl = lbl + tumor_lbl
+
+            # todo: check if this returns the right length or *2 because 2d
+            not_liver = len(np.argwhere(gen_lbl == 3))
+            in_liver = len(np.argwhere(gen_lbl > 3))
+
+            #print(f"in_liver ratio: {in_liver / (in_liver + not_liver)}")
+            if in_liver / (in_liver + not_liver) > 0.95:
+                good_placement = True
+                break #good
+
+            # Todo: add a probability for repeating the process for adding multiple tumors.
+            # look at ratio in other slices and use that??
+
+
+        if good_placement == False:
+            continue
+            
+        # merge images
+        sobel_h = ndimage.sobel(tumor_lbl, 0)  # horizontal gradient
+        sobel_v = ndimage.sobel(tumor_lbl, 1)  # vertical gradient
+        tumor_edges = np.sqrt(sobel_h**2 + sobel_v**2)
+        tumor_edges = tumor_edges / np.max(tumor_edges)
+        #tumor_edges = ndimage.gaussian_filter(tumor_edges, sigma = 0.25)
+
+        edge_locations = np.argwhere(tumor_edges > 0.5)
+        lbl_locations = np.argwhere(tumor_lbl >= 3)
+        dists = cdist(lbl_locations, edge_locations).min(axis=1)
+        distmap = np.zeros(tumor_lbl.shape)
+        distmap[tumor_lbl >= 3] = dists
+        distmap = distmap / (2*np.max(distmap))
+        distmap[distmap>0] = distmap[distmap>0] + 0.5
+
+        plt.figure("Processing", (18, 6))
+        plt.subplot(2,2,1)
+        plt.imshow(tumor_edges, cmap="gray")
+        plt.title("tumor edge")
+        
+        gen_img = np.copy(img)
+        gen_img[tumor_lbl >= 3] = tumor_img[tumor_lbl >= 3] #(0.8*tumor_img[tumor_lbl >= 3]) + (0.2*gen_img[tumor_lbl >= 3])
+
+        plt.subplot(2,2,2)
+        plt.imshow(gen_img, cmap="gray")
+        plt.title("implanted tumor")
+
+        blurred_img = ndimage.gaussian_filter(np.copy(gen_img), sigma = 0.5)
+        #blurred_img = ndimage.gaussian_filter(blurred_img, sigma = 0.75)
+        blurred_img = ndimage.gaussian_filter(blurred_img, sigma = 1)
+
+        plt.subplot(2,2,3)
+        plt.imshow(distmap, cmap="gray")
+        plt.title("distance map")
+
+        #gen_img[tumor_lbl >= 3] = ((distmap*tumor_img)[tumor_lbl >= 3]) + (((1-distmap)*img)[tumor_lbl >= 3])
+
+        plt.subplot(2,2,4)
+        plt.imshow(gen_img, cmap="gray")
+        plt.title("distance map weighted")
+
+        #plt.show()
+
+        plt.figure("New tumor", (18, 6))
+        plt.subplot(2,3,1)
+        plt.imshow(img, cmap="gray")
+        plt.title("Original")
+        plt.axis('off')
+        plt.subplot(2,3,4)
+        plt.imshow(lbl, vmin=0, vmax=5)
+        plt.axis('off')
+
+        plt.subplot(2,3,2)
+        plt.imshow(tumor_img, cmap="gray")
+        plt.axis('off')
+        plt.title("Generated tumor")
+        plt.subplot(2,3,5)
+        plt.imshow(tumor_lbl, vmin=0, vmax=5)
+        plt.axis('off')
+
+        plt.subplot(2,3,3)
+        plt.imshow(gen_img, cmap="gray")
+        plt.title("Implanted tumor")
+        plt.axis('off')
+        plt.subplot(2,3,6)
+        plt.imshow(gen_lbl, vmin=0, vmax=5)
+        plt.axis('off')
+
+        #plt.show()
+
+        gen_lbl[gen_lbl >= 3] = 2 
+        ni_img = nib.Nifti1Image(gen_img, nib_img.affine) #, img.header (?)
+        ni_lbl = nib.Nifti1Image(gen_lbl, nib_lbl.affine, dtype='<i2')
+
+        nib.save(ni_img, os.path.join(img_save_path, fname + "_" + str(tumor_size) + ".nii"))
+        nib.save(ni_lbl, os.path.join(lbl_save_path, fname + "_" + str(tumor_size) + ".nii"))
+
 
        
     
 
 
 tumor_shape = [1,256,256]
-latent_size = 2
+latent_size = 10
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-load_path = "/home/omo23/Documents/generative-models/VAE-generated/latent-2-epochs-20"
+load_path = "/home/omo23/Documents/generative-models/VAE-GAN-models/latent-10-epochs-30"
 
 model = VarAutoEncoder(
     spatial_dims=2,

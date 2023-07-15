@@ -13,10 +13,13 @@ import torch
 from urllib.request import urlretrieve
 import gzip
 from PIL import Image
+from scipy import ndimage
+from skimage.measure import label as seperate_instances
+from scipy.spatial.distance import cdist
 from monai.apps import download_and_extract
 from monai.config import print_config
 from monai.data import CacheDataset, DataLoader
-from monai.networks.nets import VarAutoEncoder
+from monai.networks.nets import VarAutoEncoder, Discriminator
 from monai.transforms import (
     AsDiscrete,
     AsDiscreted,
@@ -39,6 +42,7 @@ from monai.transforms import (
     SaveImaged,
     ScaleIntensityRanged,
     Spacingd,
+    Spacing,
     Invertd,
     EnsureTyped,
 )
@@ -46,12 +50,11 @@ from monai.utils import set_determinism
 from monai.data.utils import pad_list_data_collate
 
 ## Top for viewing. Below lines for saving
-import matplotlib.pyplot as plt
-# import matplotlib
-# matplotlib.use('Agg')
-# from matplotlib import pyplot as plt
+# import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 
-from skimage.measure import label as seperate_instances
 
 train_files_nums = ['27', '125', '124', '113', '23', '92', '36', '120', '13', '50', '110', '126', '99', '118', '73', '59', '109', '24', '44', '29', '116', '78', '104', '31', '66', '56', '88', '43', '7', '83', '108', '40', '77', '35', '121', '86', '55', '18', '69', '70', '81', '9', '11', '22', '103', '74', '107', '58', '90', '17', '12', '26', '127', '96', '5', '101', '21', '16', '62', '39', '72', '112', '71', '6', '0', '85', '102', '3', '65', '64', '128', '122']
 val_files_nums = ['75', '33', '49', '19', '61', '111', '53', '30', '28', '129', '20', '45', '51', '25', '60', '10', '84', '93', '76', '8', '97', '46', '15']

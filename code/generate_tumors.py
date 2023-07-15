@@ -1,7 +1,7 @@
 from imports import *
 
 ## viewing
-def generate_tumors(num_ims, img_shape, latent_size, device, save_path):
+def generate_tumors(num_ims, img_shape, latent_size, load_transforms, device, save_path):
     model = VarAutoEncoder(
         spatial_dims=2,
         in_shape=img_shape,
@@ -24,21 +24,28 @@ def generate_tumors(num_ims, img_shape, latent_size, device, save_path):
 
             o = model.decode_forward(sample)
             o = o.detach().cpu().numpy().reshape(img_shape[1:])
+
             mask = np.zeros(o.shape)
             thresh = (np.max(o) + np.min(o))/2
-            print(thresh)
+            #print(thresh)
             mask[o > thresh] = 1
 
-            plt.figure("generated")
-            plt.subplot(1,3,1)
+            plt.figure("generated", (18, 6))
+            plt.subplot(1,4,1)
             plt.imshow(o, cmap="gray")
 
             o[mask != 1] = 0
+
+            #todo: get the largest connected component?
+
+            inverted_img = ((o*2)-1)*200
             
-            plt.subplot(1,3,2)
+            plt.subplot(1,4,2)
             plt.imshow(o, cmap="gray")
-            plt.subplot(1,3,3)
+            plt.subplot(1,4,3)
             plt.imshow(mask)
+            plt.subplot(1,4,4)
+            plt.imshow(inverted_img)
             #plt.show()
             plt.savefig(os.path.join(save_path, "img-"+str(i)), bbox_inches='tight')
             plt.close()   
@@ -69,12 +76,15 @@ num_test = int(len(all_filenames) * test_frac) #2
 test_datadict = [{"im": fname} for fname in all_filenames[-num_test:]]
 from transforms import load_tumor_transforms
 im_shape = load_tumor_transforms(test_datadict[0])["im"].shape
+
 latent_size = 10
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-save_path = "/home/omo23/Documents/generative-models/VAE-generated/latent-10-epochs-20"
+#save_path = "/home/omo23/Documents/generative-models/VAE-models/latent-2-epochs-20"
+save_path = "/home/omo23/Documents/generative-models/VAE-GAN-models/latent-10-epochs-30"
 
 generate_tumors(num_ims=10,
                 img_shape=im_shape,
                 latent_size=latent_size,
+                load_transforms = load_tumor_transforms,
                 device=device,
                 save_path=save_path)
