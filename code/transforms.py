@@ -39,7 +39,7 @@ load_slice_transforms = Compose(
         # Rotate90d(["image", "label"], k=1, spatial_axes=(0, 1)),
         # flip_if_liver_on_right(keys=["image", "label"], label_key="label"),
         Spacingd(keys=["image", "label"], pixdim=(0.793, 0.793), mode=("bilinear", "nearest")),
-        ResizeWithPadOrCropd(keys=["image", "label"], spatial_size = [560,560]),
+        ResizeWithPadOrCropd(keys=["image", "label"], spatial_size = [576,576]),
     ]
 )
 

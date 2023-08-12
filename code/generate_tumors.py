@@ -77,10 +77,10 @@ test_datadict = [{"im": fname} for fname in all_filenames[-num_test:]]
 from transforms import load_tumor_transforms
 im_shape = load_tumor_transforms(test_datadict[0])["im"].shape
 
-latent_size = 10
+latent_size = 5
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#save_path = "/home/omo23/Documents/generative-models/VAE-models/latent-2-epochs-20"
-save_path = "/home/omo23/Documents/generative-models/VAE-GAN-models/latent-10-epochs-30"
+save_path = "/home/omo23/Documents/generative-models/VAE-models/latent-5-epochs-20"
+#save_path = "/home/omo23/Documents/generative-models/VAE-GAN-models/latent-10-epochs-30"
 
 generate_tumors(num_ims=10,
                 img_shape=im_shape,

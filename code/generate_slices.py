@@ -20,8 +20,10 @@ def generate_a_tumor(model, dist, tumor_shape, device):
 
 ## viewing
 def generate_slices(model, tumor_shape, device):
-    img_save_path = "/home/omo23/Documents/generated-data/VAE-GAN/Images"
-    lbl_save_path = "/home/omo23/Documents/generated-data/VAE-GAN/Labels"
+    img_save_path = "/home/omo23/Documents/generated-data/VAE/Images"
+    lbl_save_path = "/home/omo23/Documents/generated-data/VAE/Labels"
+    #img_save_path = "/home/omo23/Documents/generated-data/VAE-GAN/Images"
+    #lbl_save_path = "/home/omo23/Documents/generated-data/VAE-GAN/Labels"
     
     #Data loading
     data_dir = "/home/omo23/Documents/sliced-data"
@@ -29,14 +31,14 @@ def generate_slices(model, tumor_shape, device):
     all_labels = sorted(glob.glob(os.path.join(data_dir, "Labels", "*.nii")))
     data_dicts = [{"image": image_name, "label": label_name} for image_name, label_name in zip(all_images, all_labels)]
     # filter FOR slices with small tumor area or no tumor
-    data_dicts = [item for item in data_dicts if file_tumor_size(item) == 0] # min_tumor_size]
+    data_dicts = [item for item in data_dicts if file_tumor_size(item) < min_tumor_size] # min_tumor_size]
 
     gen_files = []
     for d in data_dicts:
         d_num = d['image']
         d_num = d_num[d_num.rfind("/")+1:d_num.rfind("-")] 
 
-        if d_num not in test_files_nums + val_files_nums:
+        if d_num in train_files_nums:   #not in test_files_nums + val_files_nums:
             gen_files.append(d)
 
     t_spacing = Spacing(pixdim=(0.793, 0.793), mode=("bilinear"))
@@ -185,8 +187,8 @@ def generate_slices(model, tumor_shape, device):
         #plt.show()
 
         gen_lbl[gen_lbl >= 3] = 2 
-        ni_img = nib.Nifti1Image(gen_img, nib_img.affine) #, img.header (?)
-        ni_lbl = nib.Nifti1Image(gen_lbl, nib_lbl.affine, dtype='<i2')
+        ni_img = nib.Nifti1Image(gen_img, nib_img.affine, nib_img.header) #, img.header (?)
+        ni_lbl = nib.Nifti1Image(gen_lbl, nib_lbl.affine, nib_lbl.header, dtype='<i2')
 
         nib.save(ni_img, os.path.join(img_save_path, fname + "_" + str(tumor_size) + ".nii"))
         nib.save(ni_lbl, os.path.join(lbl_save_path, fname + "_" + str(tumor_size) + ".nii"))
@@ -197,9 +199,10 @@ def generate_slices(model, tumor_shape, device):
 
 
 tumor_shape = [1,256,256]
-latent_size = 10
+latent_size = 5
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-load_path = "/home/omo23/Documents/generative-models/VAE-GAN-models/latent-10-epochs-30"
+#load_path = "/home/omo23/Documents/generative-models/VAE-GAN-models/latent-10-epochs-30"
+load_path = "/home/omo23/Documents/generative-models/VAE-models/latent-5-epochs-20"
 
 model = VarAutoEncoder(
     spatial_dims=2,
